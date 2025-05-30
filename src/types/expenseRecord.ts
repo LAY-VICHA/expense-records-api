@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const expenseRecordQuerySchema = z.object({
-  page: z.number(),
-  pageSize: z.number(),
+  // page: z.number(),
+  // pageSize: z.number(),
   reason: z.string().optional(),
   sortBy: z.enum(["newest", "oldest", "highest", "lowest"]).optional(),
   filterCategory: z.string().optional(),

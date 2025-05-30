@@ -11,6 +11,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.18",
     "@types/date-fns": "^2.5.3",
     "@types/express": "^5.0.1",
     "@types/multer": "^1.4.12",
@@ -37,6 +38,7 @@
     "multer": "^2.0.0",
     "pg": "^8.16.0",
     "strip-bom-stream": "^5.0.0",
+    "typescript": "^5.8.3",
     "zod": "^3.25.13"
   }
 }

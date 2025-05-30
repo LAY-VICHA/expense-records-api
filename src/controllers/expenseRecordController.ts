@@ -6,12 +6,11 @@ import {
   subCategoryTable,
 } from "@/db/schema";
 import fs from "fs";
-import { and, eq, gte, ilike, lte, sql } from "drizzle-orm";
+import { and, eq, gte, ilike, lte, sql, SQLWrapper } from "drizzle-orm";
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "@/middleware/error";
 import { generateIdFromEntropySize } from "@/lib/random";
 import { parse as csvParse } from "csv-parse";
-import { parse as parseDateFns } from "date-fns";
 import stripBomStream from "strip-bom-stream";
 import { expenseRecordQuerySchema } from "@/types/expenseRecord";
 
@@ -27,12 +26,9 @@ export const getExpenseRecord = async (
     error.status = 400;
     return next(error);
   }
-  // const page: number = Number(req.query.page) ?? 1;
-  // const pageSize: number = Number(req.query.pageSize) ?? 10;
-  // const reason: string | null = req.query.reason as string;
-  // const sortBy: string | null = req.query.sortBy as string;
+  const page: number = Number(req.query.page) ?? 1;
+  const pageSize: number = Number(req.query.pageSize) ?? 10;
 
-  // need to add more rule like sorting, filtering, search, filter by date and more
   let sqlQuery = db
     .select({
       id: expenseRecordTable.id,
@@ -46,10 +42,12 @@ export const getExpenseRecord = async (
       updatedAt: expenseRecordTable.updatedAt,
     })
     .from(expenseRecordTable)
+    .orderBy(sql`${expenseRecordTable.expenseDate} desc`)
     .$dynamic();
 
+  const conditions: SQLWrapper[] = [];
   if (parseResult.data?.reason && parseResult.data?.reason.trim() !== "") {
-    sqlQuery = sqlQuery.where(
+    conditions.push(
       ilike(expenseRecordTable.reason, `%${parseResult.data?.reason}%`)
     );
   }
@@ -63,12 +61,14 @@ export const getExpenseRecord = async (
     } else {
       sqlQuery = sqlQuery.orderBy(sql`${expenseRecordTable.amount} asc`);
     }
+  } else {
+    sqlQuery = sqlQuery.orderBy(sql`${expenseRecordTable.expenseDate} desc`);
   }
   if (
     parseResult.data?.filterCategory &&
     parseResult.data?.filterCategory.trim() !== ""
   ) {
-    sqlQuery = sqlQuery.where(
+    conditions.push(
       ilike(
         expenseRecordTable.category,
         `%${parseResult.data?.filterCategory}%`
@@ -79,7 +79,7 @@ export const getExpenseRecord = async (
     parseResult.data?.filterSubCategory &&
     parseResult.data?.filterSubCategory.trim() !== ""
   ) {
-    sqlQuery = sqlQuery.where(
+    conditions.push(
       ilike(
         expenseRecordTable.subCategory,
         `%${parseResult.data?.filterSubCategory}%`
@@ -92,33 +92,37 @@ export const getExpenseRecord = async (
     parseResult.data?.filterEndDate &&
     parseResult.data?.filterEndDate.trim() !== ""
   ) {
-    sqlQuery = sqlQuery.where(
-      and(
-        gte(
-          expenseRecordTable.expenseDate,
-          new Date(parseResult.data?.filterStartDate as string)
-        ),
-        lte(
-          expenseRecordTable.expenseDate,
-          new Date(parseResult.data?.filterEndDate as string)
-        )
+    conditions.push(
+      gte(
+        expenseRecordTable.expenseDate,
+        new Date(parseResult.data?.filterStartDate as string)
+      ),
+      lte(
+        expenseRecordTable.expenseDate,
+        new Date(parseResult.data?.filterEndDate as string)
       )
     );
   }
 
+  if (conditions.length > 0) {
+    sqlQuery = sqlQuery.where(and(...conditions));
+  }
+
   const [count, items] = await Promise.all([
     db.$count(sqlQuery.as("sq")),
-    sqlQuery
-      .limit(parseResult.data.pageSize)
-      .offset((parseResult.data.page - 1) * parseResult.data.pageSize),
+    sqlQuery.limit(pageSize).offset((page - 1) * pageSize),
   ]);
 
   res.json({
-    items,
-    currentPage: parseResult.data.page,
-    totalPages: Math.ceil(count / parseResult.data.pageSize),
-    totalItems: count,
-    pageSize: parseResult.data.pageSize,
+    success: true,
+    data: {
+      items,
+      currentPage: page,
+      totalPages: Math.ceil(count / pageSize),
+      totalItems: count,
+      pageSize,
+    },
+    message: "Expense records fetched successfully",
   });
 };
 
@@ -152,6 +156,7 @@ export const createExpenseRecord = async (
   const expenseRecordId = generateIdFromEntropySize(5);
   const data = req.body;
   data.id = expenseRecordId;
+  data.expenseDate = new Date(data.expenseDate);
 
   const category = await db.query.categoryTable.findFirst({
     where: and(eq(categoryTable.name, data.category)),
@@ -253,7 +258,12 @@ export const handleBulkExpenseRecord = async (
       }
 
       const expenseRecordId = generateIdFromEntropySize(5);
-      const expenseDate = parseDateFns(row.expenseDate, "M/d/yyyy", new Date());
+      // const expenseDate = parseDateFns(
+      //   row.expenseDate,
+      //   "yyyy-MM-dd",
+      //   new Date()
+      // );
+      const expenseDate = new Date(row.expenseDate);
       expenseDate.setHours(12, 0, 0, 0);
 
       results.push({

@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { categoryTable } from "@/db/schema";
-import { and, eq, ilike } from "drizzle-orm";
+import { and, eq, ilike, sql } from "drizzle-orm";
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "@/middleware/error";
 import { generateIdFromEntropySize } from "@/lib/random";
@@ -23,6 +23,7 @@ export const getCategory = async (
       updatedAt: categoryTable.updatedAt,
     })
     .from(categoryTable)
+    .orderBy(sql`${categoryTable.createdAt} desc`)
     .$dynamic();
 
   if (name && name.trim() !== "") {
@@ -35,11 +36,32 @@ export const getCategory = async (
   ]);
 
   res.json({
-    items,
-    currentPage: page,
-    totalPages: Math.ceil(count / pageSize),
-    totalItems: count,
-    pageSize,
+    success: true,
+    data: {
+      items,
+      currentPage: page,
+      totalPages: Math.ceil(count / pageSize),
+      totalItems: count,
+      pageSize,
+    },
+    message: "Categories fetched successfully",
+  });
+};
+
+export const getAllCategory = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const categories = await db.query.categoryTable.findMany({
+    with: {
+      subCategories: true,
+    },
+  });
+  res.json({
+    data: categories,
+    message: "Categories fetched successfully",
+    success: true,
   });
 };
 

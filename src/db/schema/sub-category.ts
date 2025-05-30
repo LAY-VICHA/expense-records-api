@@ -2,6 +2,7 @@ import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import type { z } from "zod";
 import { categoryTable } from "./category";
+import { relations } from "drizzle-orm";
 
 export const subCategoryTable = pgTable("sub_category", {
   id: text("id").primaryKey(),
@@ -21,6 +22,14 @@ export const subCategoryTable = pgTable("sub_category", {
     mode: "date",
   }),
 });
+
+export const subCategoryRelations = relations(subCategoryTable, ({ one }) => ({
+  category: one(categoryTable, {
+    fields: [subCategoryTable.categoryId],
+    references: [categoryTable.id],
+  }),
+}));
+
 export const insertSubCategorySchema = createInsertSchema(subCategoryTable);
 
 export type subCategory = typeof subCategoryTable.$inferSelect;

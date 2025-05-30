@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { categoryTable, subCategoryTable } from "@/db/schema";
-import { and, eq, ilike } from "drizzle-orm";
+import { and, eq, ilike, sql } from "drizzle-orm";
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "@/middleware/error";
 import { generateIdFromEntropySize } from "@/lib/random";
@@ -28,6 +28,7 @@ export const getSubCategory = async (
     })
     .from(subCategoryTable)
     .innerJoin(categoryTable, eq(subCategoryTable.categoryId, categoryTable.id))
+    .orderBy(sql`${subCategoryTable.createdAt} desc`)
     .$dynamic();
 
   if (name && name.trim() !== "") {
@@ -40,11 +41,15 @@ export const getSubCategory = async (
   ]);
 
   res.json({
-    items,
-    currentPage: page,
-    totalPages: Math.ceil(count / pageSize),
-    totalItems: count,
-    pageSize,
+    success: true,
+    data: {
+      items,
+      currentPage: page,
+      totalPages: Math.ceil(count / pageSize),
+      totalItems: count,
+      pageSize,
+    },
+    message: "Categories fetched successfully",
   });
 };
 
