@@ -13,6 +13,7 @@ import { generateIdFromEntropySize } from "@/lib/random";
 import { parse as csvParse } from "csv-parse";
 import stripBomStream from "strip-bom-stream";
 import { expenseRecordQuerySchema } from "@/types/expenseRecord";
+import { parseDate } from "@/lib/dateParse";
 
 export const getExpenseRecord = async (
   req: Request,
@@ -92,15 +93,12 @@ export const getExpenseRecord = async (
     parseResult.data?.filterEndDate &&
     parseResult.data?.filterEndDate.trim() !== ""
   ) {
+    const startDate = parseDate(parseResult.data.filterStartDate);
+    const endDate = parseDate(parseResult.data.filterEndDate, true);
+
     conditions.push(
-      gte(
-        expenseRecordTable.expenseDate,
-        new Date(parseResult.data?.filterStartDate as string)
-      ),
-      lte(
-        expenseRecordTable.expenseDate,
-        new Date(parseResult.data?.filterEndDate as string)
-      )
+      gte(expenseRecordTable.expenseDate, startDate),
+      lte(expenseRecordTable.expenseDate, endDate)
     );
   }
 
@@ -204,13 +202,10 @@ export const handleBulkExpenseRecord = async (
     return next(error);
   }
 
-  const results: NewExpenseRecord[] = [];
   const categories = await db.query.categoryTable.findMany({
-    columns: {
-      id: true,
-      name: true,
-    },
+    columns: { id: true, name: true },
   });
+
   if (!categories) {
     const error = new Error(`Unable to get categories data`) as AppError;
     error.status = 500;
@@ -218,83 +213,80 @@ export const handleBulkExpenseRecord = async (
   }
 
   const subCategories = await db.query.subCategoryTable.findMany({
-    columns: {
-      id: true,
-      name: true,
-    },
+    columns: { id: true, name: true },
   });
+
   if (!subCategories) {
     const error = new Error(`Unable to get sub-categories data`) as AppError;
     error.status = 500;
     return next(error);
   }
 
+  const rawRows: any[] = [];
+
   fs.createReadStream(file.path)
     .pipe(stripBomStream())
     .pipe(csvParse({ columns: true, trim: true }))
-    .on("data", async (row) => {
-      const categoryExist = categories.some(
-        (category) => category.name === row.category
-      );
-
-      if (!categoryExist) {
-        const error = new Error(
-          `Expense record with category ${row.category} was not found`
-        ) as AppError;
-        error.status = 400;
-        return next(error);
-      }
-
-      const subCategoryExist = subCategories.some(
-        (subCategory) => subCategory.name === row.subCategory
-      );
-
-      if (!subCategoryExist) {
-        const error = new Error(
-          `Expense record with sub-category ${row.subCategory} was not found`
-        ) as AppError;
-        error.status = 400;
-        return next(error);
-      }
-
-      const expenseRecordId = generateIdFromEntropySize(5);
-      // const expenseDate = parseDateFns(
-      //   row.expenseDate,
-      //   "yyyy-MM-dd",
-      //   new Date()
-      // );
-      const expenseDate = new Date(row.expenseDate);
-      expenseDate.setHours(12, 0, 0, 0);
-
-      results.push({
-        id: expenseRecordId,
-        expenseDate: expenseDate,
-        amount: parseFloat(row.amount).toString(),
-        currency: row.currency,
-        reason: row.reason,
-        category: row.category,
-        subCategory: row.subCategory,
-        createdAt: new Date(),
-      });
+    .on("data", (row) => {
+      rawRows.push(row);
     })
     .on("end", async () => {
       try {
+        const results: NewExpenseRecord[] = [];
+
+        for (const row of rawRows) {
+          const categoryExist = categories.some(
+            (category) => category.name === row.category
+          );
+
+          if (!categoryExist) {
+            throw new Error(
+              `Expense record with category ${row.category} was not found`
+            );
+          }
+
+          const subCategoryExist = subCategories.some(
+            (subCategory) => subCategory.name === row.subCategory
+          );
+
+          if (!subCategoryExist) {
+            throw new Error(
+              `Expense record with sub-category ${row.subCategory} was not found`
+            );
+          }
+
+          const expenseDate = new Date(row.expenseDate);
+          expenseDate.setHours(12, 0, 0, 0);
+
+          results.push({
+            id: generateIdFromEntropySize(5),
+            expenseDate: expenseDate,
+            amount: parseFloat(row.amount).toString(),
+            currency: row.currency,
+            reason: row.reason,
+            category: row.category,
+            subCategory: row.subCategory,
+            createdAt: new Date(),
+          });
+        }
+
         await db.insert(expenseRecordTable).values(results);
+
         res.status(200).json({
           status: 200,
           message: "Expense records uploaded successfully",
           data: results,
           count: results.length,
         });
-      } catch (err) {
-        res.status(500).json({ error: "Failed to insert expenses." });
+      } catch (err: any) {
+        res.status(400).json({ error: err.message || "Upload failed" });
       } finally {
         console.log("----- clear uploaded file -----");
-
-        fs.unlinkSync(file.path); // Clean up uploaded file
+        fs.unlinkSync(file.path);
       }
     })
     .on("error", (err) => {
+      console.error("CSV parse error:", err);
       fs.unlinkSync(file.path);
       res.status(500).json({ error: "Failed to parse CSV." });
     });
@@ -357,15 +349,19 @@ export const updateExpenseRecord = async (
     }
   }
 
+  if (data.expenseDate) {
+    data.expenseDate = new Date(data.expenseDate);
+  }
+
   const updatedExpenseRecord = await db
     .update(expenseRecordTable)
     .set({
-      ...(data.expenseDate && { name: data.expenseDate }),
-      ...(data.amount && { amount: data.description }),
-      ...(data.currency && { currency: data.description }),
-      ...(data.reason && { reason: data.description }),
-      ...(data.category && { category: data.description }),
-      ...(data.subCategory && { subCategory: data.description }),
+      ...(data.expenseDate && { expenseDate: data.expenseDate }),
+      ...(data.amount && { amount: data.amount }),
+      ...(data.currency && { currency: data.currency }),
+      ...(data.reason && { reason: data.reason }),
+      ...(data.category && { category: data.category }),
+      ...(data.subCategory && { subCategory: data.subCategory }),
       updatedAt: new Date(),
     })
     .where(eq(expenseRecordTable.id, id))

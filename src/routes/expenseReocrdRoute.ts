@@ -18,5 +18,4 @@ router.post("/bulk", upload.single("file"), handleBulkExpenseRecord);
 router.put("/:id", updateExpenseRecord);
 router.delete("/:id", deleteExpenseRecord);
 
-//hello world
 export default router;
