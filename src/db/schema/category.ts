@@ -3,11 +3,15 @@ import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import type { z } from "zod";
 import { subCategoryTable } from "./sub-category";
+import { userTable } from "./user";
 
 export const categoryTable = pgTable("category", {
   id: text("id").primaryKey(),
   name: text("name").unique().notNull(),
   description: text("description"),
+  userId: text("user_id")
+    .notNull()
+    .references(() => userTable.id),
   createdAt: timestamp("created_at", {
     withTimezone: true,
     mode: "date",

@@ -7,6 +7,8 @@ interface Config {
   nodeEnv: string;
   DB_URL: string;
   highExpenseThreshold: string;
+  resendApiKey: string;
+  jwtSecretKey: string;
 }
 
 const config: Config = {
@@ -14,6 +16,8 @@ const config: Config = {
   nodeEnv: process.env.NODE_ENV || "development",
   DB_URL: process.env.DB_URL || "",
   highExpenseThreshold: process.env.HIGH_EXPENSE_THRESHOLD || "500",
+  resendApiKey: process.env.RESEND_API_KEY || "",
+  jwtSecretKey: process.env.JWT_SECRET_KEY || "",
 };
 
 export default config;

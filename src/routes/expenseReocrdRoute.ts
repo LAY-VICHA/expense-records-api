@@ -8,14 +8,20 @@ import {
   deleteExpenseRecord,
 } from "@/controllers/expenseRecordController";
 import { upload } from "../middleware/upload";
+import { authenticateToken } from "@/middleware/authentication";
 
 const router = express.Router();
 
-router.get("/", getExpenseRecord);
-router.get("/:id", getExpenseRecordById);
-router.post("/", createExpenseRecord);
-router.post("/bulk", upload.single("file"), handleBulkExpenseRecord);
-router.put("/:id", updateExpenseRecord);
-router.delete("/:id", deleteExpenseRecord);
+router.get("/", authenticateToken, getExpenseRecord);
+router.get("/:id", authenticateToken, getExpenseRecordById);
+router.post("/", authenticateToken, createExpenseRecord);
+router.post(
+  "/bulk",
+  authenticateToken,
+  upload.single("file"),
+  handleBulkExpenseRecord
+);
+router.put("/:id", authenticateToken, updateExpenseRecord);
+router.delete("/:id", authenticateToken, deleteExpenseRecord);
 
 export default router;

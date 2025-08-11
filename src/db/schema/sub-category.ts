@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import type { z } from "zod";
 import { categoryTable } from "./category";
 import { relations } from "drizzle-orm";
+import { userTable } from "./user";
 
 export const subCategoryTable = pgTable("sub_category", {
   id: text("id").primaryKey(),
@@ -11,6 +12,9 @@ export const subCategoryTable = pgTable("sub_category", {
   categoryId: text("category_id")
     .notNull()
     .references(() => categoryTable.id),
+  userId: text("user_id")
+    .notNull()
+    .references(() => userTable.id),
   createdAt: timestamp("created_at", {
     withTimezone: true,
     mode: "date",

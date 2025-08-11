@@ -4,10 +4,11 @@ import {
   getDashboardBarchart,
   getDashboardPiechart,
 } from "@/controllers/dashboardController";
+import { authenticateToken } from "@/middleware/authentication";
 const router = express.Router();
 
-router.get("/", getDashboardCardData);
-router.get("/bar-chart", getDashboardBarchart);
-router.get("/pie-chart", getDashboardPiechart);
+router.get("/", authenticateToken, getDashboardCardData);
+router.get("/bar-chart", authenticateToken, getDashboardBarchart);
+router.get("/pie-chart", authenticateToken, getDashboardPiechart);
 
 export default router;

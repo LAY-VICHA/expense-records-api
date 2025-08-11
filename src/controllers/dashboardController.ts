@@ -1,6 +1,10 @@
 import { db } from "@/db";
-import { expenseRecordTable } from "@/db/schema";
-import { sql } from "drizzle-orm";
+import {
+  categoryTable,
+  expenseRecordTable,
+  subCategoryTable,
+} from "@/db/schema";
+import { sql, and, gte, lte, lt, eq } from "drizzle-orm";
 import { Request, Response, NextFunction } from "express";
 import {
   dashboardBarChartQuerySchema,
@@ -8,18 +12,28 @@ import {
 } from "@/types/dashboard";
 import { AppError } from "@/middleware/error";
 import config from "@/config/config";
+import { AuthenticatedRequest } from "@/middleware/authentication";
 
 export const getDashboardCardData = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
+  const { user } = req as AuthenticatedRequest;
+
+  if (!user.id) {
+    const error = new Error("User is not authenticated") as AppError;
+    error.status = 401;
+    return next(error);
+  }
+
   const result = await db
     .select({
       totalExpense: sql<number>`SUM(CAST(${expenseRecordTable.amount} AS DECIMAL))`,
       oldestDate: sql<Date>`MIN(${expenseRecordTable.expenseDate})`,
     })
-    .from(expenseRecordTable);
+    .from(expenseRecordTable)
+    .where(eq(expenseRecordTable.userId, user.id));
 
   const { totalExpense, oldestDate } = result[0];
 
@@ -33,6 +47,7 @@ export const getDashboardCardData = async (
       },
       message: "No data available for dashboard card",
     });
+    return;
   }
 
   const today = new Date();
@@ -51,6 +66,7 @@ export const getDashboardCardData = async (
     },
     message: "Dashboard card data fetched successfully",
   });
+  return;
 };
 
 export const getDashboardBarchart = async (
@@ -58,6 +74,14 @@ export const getDashboardBarchart = async (
   res: Response,
   next: NextFunction
 ) => {
+  const { user } = req as AuthenticatedRequest;
+
+  if (!user.id) {
+    const error = new Error("User is not authenticated") as AppError;
+    error.status = 401;
+    return next(error);
+  }
+
   const result = dashboardBarChartQuerySchema.safeParse(req.query);
 
   if (!result.success) {
@@ -92,10 +116,11 @@ export const getDashboardBarchart = async (
   const expenses = await db.query.expenseRecordTable.findMany({
     where: (fields, { and, eq, gte, lt }) =>
       and(
+        eq(expenseRecordTable.userId, user.id),
         gte(fields.expenseDate, startDate),
-        selectedCategory ? eq(fields.category, selectedCategory) : undefined,
+        selectedCategory ? eq(fields.categoryId, selectedCategory) : undefined,
         selectedSubCategory
-          ? eq(fields.subCategory, selectedSubCategory)
+          ? eq(fields.subCategoryId, selectedSubCategory)
           : undefined,
         !includeHigh
           ? lt(fields.amount, config.highExpenseThreshold)
@@ -142,6 +167,7 @@ export const getDashboardBarchart = async (
     },
     message: "Dashboard bar chart data fetched successfully",
   });
+  return;
 };
 
 export const getDashboardPiechart = async (
@@ -149,9 +175,15 @@ export const getDashboardPiechart = async (
   res: Response,
   next: NextFunction
 ) => {
-  const result = dashboardPieChartQuerySchema.safeParse(req.query);
+  const { user } = req as AuthenticatedRequest;
 
-  console.log(result);
+  if (!user.id) {
+    const error = new Error("User is not authenticated") as AppError;
+    error.status = 401;
+    return next(error);
+  }
+
+  const result = dashboardPieChartQuerySchema.safeParse(req.query);
 
   if (!result.success) {
     const error = new Error(`Invalid query parameter.`) as AppError;
@@ -174,16 +206,35 @@ export const getDashboardPiechart = async (
     ? new Date(year, month, 0, 30, 59, 59, 999)
     : new Date(year, 11, 31, 30, 59, 59, 999);
 
-  const records = await db.query.expenseRecordTable.findMany({
-    where: (fields, { and, gte, lte, lt }) =>
+  const records = await db
+    .select({
+      id: expenseRecordTable.id,
+      amount: expenseRecordTable.amount,
+      expenseDate: expenseRecordTable.expenseDate,
+      categoryId: expenseRecordTable.categoryId,
+      categoryName: categoryTable.name,
+      subCategoryId: expenseRecordTable.subCategoryId,
+      subCategoryName: subCategoryTable.name,
+    })
+    .from(expenseRecordTable)
+    .leftJoin(
+      categoryTable,
+      eq(expenseRecordTable.categoryId, categoryTable.id)
+    )
+    .leftJoin(
+      subCategoryTable,
+      eq(expenseRecordTable.subCategoryId, subCategoryTable.id)
+    )
+    .where(
       and(
-        gte(fields.expenseDate, startDate),
-        lte(fields.expenseDate, endDate),
+        eq(expenseRecordTable.userId, user.id),
+        gte(expenseRecordTable.expenseDate, startDate),
+        lte(expenseRecordTable.expenseDate, endDate),
         !includeHigh
-          ? lt(fields.amount, config.highExpenseThreshold)
+          ? lt(expenseRecordTable.amount, config.highExpenseThreshold)
           : undefined
-      ),
-  });
+      )
+    );
 
   if (!records || records.length === 0) {
     const error = new Error(`No Data`) as AppError;
@@ -195,7 +246,14 @@ export const getDashboardPiechart = async (
   let totalExpense = 0;
 
   for (const record of records) {
-    const key = record[groupBy] ?? "";
+    let key = "";
+    if (groupBy === "category") {
+      key = record.categoryName ?? "";
+    } else if (groupBy === "subCategory") {
+      key = record.subCategoryName ?? "";
+    } else {
+      key = "";
+    }
     const amount = parseFloat(record.amount);
 
     if (!groupMap.has(key)) {
@@ -229,4 +287,5 @@ export const getDashboardPiechart = async (
     },
     message: "Dashboard pie chart data fetched successfully",
   });
+  return;
 };
