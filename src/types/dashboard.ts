@@ -1,9 +1,10 @@
+import { year } from "drizzle-orm/mysql-core";
 import { z } from "zod";
 
 export const dashboardBarChartQuerySchema = z.object({
   selectedCategory: z.string().optional(),
   selectedSubCategory: z.string().optional(),
-  periodType: z.enum(["monthly", "yearly"]).default("monthly"),
+  yearBarChart: z.string().optional().default(String(new Date().getFullYear())),
   isIncludeHighExpenseRecord: z
     .union([z.literal("true"), z.literal("false")])
     .default("false"),

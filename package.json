@@ -7,7 +7,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev": "npx tsc --noEmit && npx tsx --watch src/app.ts",
+    "dev": "npx.cmd tsc --noEmit && npx.cmd tsx --watch src/app.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "db:generate": "npx drizzle-kit generate",
     "db:migrate": "npx drizzle-kit migrate"

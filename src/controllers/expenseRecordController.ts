@@ -15,6 +15,8 @@ import stripBomStream from "strip-bom-stream";
 import { expenseRecordQuerySchema } from "@/types/expenseRecord";
 import { parseDate } from "@/lib/dateParse";
 import { AuthenticatedRequest } from "@/middleware/authentication";
+import { parse } from "path";
+import config from "@/config/config";
 
 export const getExpenseRecord = async (
   req: Request,
@@ -119,6 +121,13 @@ export const getExpenseRecord = async (
     conditions.push(
       gte(expenseRecordTable.expenseDate, startDate),
       lte(expenseRecordTable.expenseDate, endDate)
+    );
+  }
+  if (parseResult.data?.isHighExpenseRecord === "true") {
+    console.log("include high expense records");
+
+    conditions.push(
+      gte(expenseRecordTable.amount, config.highExpenseThreshold)
     );
   }
 

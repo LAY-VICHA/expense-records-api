@@ -14,6 +14,18 @@ import { AppError } from "@/middleware/error";
 import config from "@/config/config";
 import { AuthenticatedRequest } from "@/middleware/authentication";
 
+function buildYearData(year: string, groupedMap: Map<string, number>) {
+  const dataPoints = Array.from({ length: 12 }, (_, month) => {
+    const label = `${year}-${month + 1}`;
+    return {
+      date: label,
+      amount: groupedMap.get(label) ?? 0, 
+    };
+  });
+
+  return dataPoints;
+}
+
 export const getDashboardCardData = async (
   req: Request,
   res: Response,
@@ -93,31 +105,33 @@ export const getDashboardBarchart = async (
   const {
     selectedCategory,
     selectedSubCategory,
-    periodType,
     isIncludeHighExpenseRecord,
+    yearBarChart,
   } = result.data;
   const includeHigh = isIncludeHighExpenseRecord === "true";
 
-  const now = new Date();
-  let groupBy: "month" | "year";
-  let periodCount: number = 0;
   let startDate: Date;
+  let endDate: Date;
 
-  if (periodType === "monthly") {
-    groupBy = "month";
-    startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1, 7, 0, 0, 0); // last 12 months
-    periodCount = 12;
-  } else {
-    groupBy = "year";
-    startDate = new Date(now.getFullYear() - 6, 0, 1, 7, 0, 0, 0); // last 7 years
-    periodCount = 7;
+  if (yearBarChart) {
+    const numericYear = parseInt(yearBarChart, 10);
+    if (isNaN(numericYear)) {
+      const error = new Error("Invalid year") as AppError;
+      error.status = 400;
+      return next(error);
+    }
+    startDate = new Date(numericYear, 0, 1, 0, 0, 0, 0);
+    endDate = new Date(numericYear + 1, 0, 1, 0, 0, 0, 0); 
   }
+
 
   const expenses = await db.query.expenseRecordTable.findMany({
     where: (fields, { and, eq, gte, lt }) =>
       and(
         eq(expenseRecordTable.userId, user.id),
+        // gte(fields.expenseDate, startDate),
         gte(fields.expenseDate, startDate),
+        lt(fields.expenseDate, endDate),
         selectedCategory ? eq(fields.categoryId, selectedCategory) : undefined,
         selectedSubCategory
           ? eq(fields.subCategoryId, selectedSubCategory)
@@ -128,21 +142,18 @@ export const getDashboardBarchart = async (
       ),
   });
 
-  if (!expenses || expenses.length === 0) {
-    const error = new Error(`No data`) as AppError;
-    error.status = 404;
-    return next(error);
-  }
+  // if (!expenses || expenses.length === 0) {
+  //   const error = new Error(`No data`) as AppError;
+  //   error.status = 404;
+  //   return next(error);
+  // }
 
   const groupedMap = new Map<string, number>();
   let totalExpense = 0;
 
   for (const record of expenses) {
     const date = new Date(record.expenseDate);
-    const key =
-      groupBy === "year"
-        ? `${date.getFullYear()}`
-        : `${date.getFullYear()}-${date.getMonth() + 1}`;
+    const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
 
     const amount = parseFloat(record.amount);
     if (!groupedMap.has(key)) groupedMap.set(key, 0);
@@ -160,10 +171,7 @@ export const getDashboardBarchart = async (
       totalExpense: parseFloat(totalExpense.toFixed(2)),
       averageExpense: parseFloat(averageExpense.toFixed(2)),
       periodsWithData,
-      dataPoints: Array.from(groupedMap.entries()).map(([label, value]) => ({
-        date: label,
-        amount: value,
-      })),
+      dataPoints: buildYearData(yearBarChart, groupedMap),
     },
     message: "Dashboard bar chart data fetched successfully",
   });
@@ -236,11 +244,11 @@ export const getDashboardPiechart = async (
       )
     );
 
-  if (!records || records.length === 0) {
-    const error = new Error(`No Data`) as AppError;
-    error.status = 404;
-    return next(error);
-  }
+  // if (!records || records.length === 0) {
+  //   const error = new Error(`No Data`) as AppError;
+  //   error.status = 404;
+  //   return next(error);
+  // }
 
   const groupMap = new Map<string, { total: number; count: number }>();
   let totalExpense = 0;
@@ -278,6 +286,15 @@ export const getDashboardPiechart = async (
           : 0,
       count,
     }));
+
+  if (response.length === 0) {
+    response.push({
+      label: 'No Data',
+      amount: '1',
+      percentage: 100,
+      count: 1,
+    })
+  }  
 
   res.json({
     success: true,

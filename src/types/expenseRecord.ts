@@ -7,4 +7,7 @@ export const expenseRecordQuerySchema = z.object({
   filterSubCategory: z.string().optional(),
   filterStartDate: z.string().optional(),
   filterEndDate: z.string().optional(),
+  isHighExpenseRecord: z
+    .union([z.literal("true"), z.literal("false")])
+    .default("false"),
 });
