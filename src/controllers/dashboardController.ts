@@ -19,7 +19,7 @@ function buildYearData(year: string, groupedMap: Map<string, number>) {
     const label = `${year}-${month + 1}`;
     return {
       date: label,
-      amount: groupedMap.get(label) ?? 0, 
+      amount: groupedMap.get(label) ?? 0,
     };
   });
 
@@ -29,7 +29,7 @@ function buildYearData(year: string, groupedMap: Map<string, number>) {
 export const getDashboardCardData = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   const { user } = req as AuthenticatedRequest;
 
@@ -68,6 +68,7 @@ export const getDashboardCardData = async (
   const totalDays = Math.max(Math.ceil(findTotalDays / (1000 * 3600 * 24)), 1);
 
   const averagePerDay = Number(totalExpense) / totalDays;
+  console.log(Number(totalExpense));
 
   res.json({
     success: true,
@@ -84,7 +85,7 @@ export const getDashboardCardData = async (
 export const getDashboardBarchart = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   const { user } = req as AuthenticatedRequest;
 
@@ -120,25 +121,24 @@ export const getDashboardBarchart = async (
       error.status = 400;
       return next(error);
     }
-    startDate = new Date(numericYear, 0, 1, 0, 0, 0, 0);
-    endDate = new Date(numericYear + 1, 0, 1, 0, 0, 0, 0); 
+    startDate = new Date(numericYear, 0, 1, 7, 0, 0, 0);
+    endDate = new Date(numericYear, 11, 31, 30, 59, 59, 999);
+    console.log("sasas", startDate, endDate);
   }
-
 
   const expenses = await db.query.expenseRecordTable.findMany({
     where: (fields, { and, eq, gte, lt }) =>
       and(
         eq(expenseRecordTable.userId, user.id),
-        // gte(fields.expenseDate, startDate),
         gte(fields.expenseDate, startDate),
-        lt(fields.expenseDate, endDate),
+        lte(fields.expenseDate, endDate),
         selectedCategory ? eq(fields.categoryId, selectedCategory) : undefined,
         selectedSubCategory
           ? eq(fields.subCategoryId, selectedSubCategory)
           : undefined,
         !includeHigh
           ? lt(fields.amount, config.highExpenseThreshold)
-          : undefined
+          : undefined,
       ),
   });
 
@@ -181,7 +181,7 @@ export const getDashboardBarchart = async (
 export const getDashboardPiechart = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   const { user } = req as AuthenticatedRequest;
 
@@ -227,11 +227,11 @@ export const getDashboardPiechart = async (
     .from(expenseRecordTable)
     .leftJoin(
       categoryTable,
-      eq(expenseRecordTable.categoryId, categoryTable.id)
+      eq(expenseRecordTable.categoryId, categoryTable.id),
     )
     .leftJoin(
       subCategoryTable,
-      eq(expenseRecordTable.subCategoryId, subCategoryTable.id)
+      eq(expenseRecordTable.subCategoryId, subCategoryTable.id),
     )
     .where(
       and(
@@ -240,8 +240,8 @@ export const getDashboardPiechart = async (
         lte(expenseRecordTable.expenseDate, endDate),
         !includeHigh
           ? lt(expenseRecordTable.amount, config.highExpenseThreshold)
-          : undefined
-      )
+          : undefined,
+      ),
     );
 
   // if (!records || records.length === 0) {
@@ -289,12 +289,12 @@ export const getDashboardPiechart = async (
 
   if (response.length === 0) {
     response.push({
-      label: 'No Data',
-      amount: '1',
+      label: "No Data",
+      amount: "1",
       percentage: 100,
       count: 1,
-    })
-  }  
+    });
+  }
 
   res.json({
     success: true,

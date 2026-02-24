@@ -15,13 +15,12 @@ import stripBomStream from "strip-bom-stream";
 import { expenseRecordQuerySchema } from "@/types/expenseRecord";
 import { parseDate } from "@/lib/dateParse";
 import { AuthenticatedRequest } from "@/middleware/authentication";
-import { parse } from "path";
 import config from "@/config/config";
 
 export const getExpenseRecord = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   const { user } = req as AuthenticatedRequest;
 
@@ -59,11 +58,11 @@ export const getExpenseRecord = async (
     .where(eq(expenseRecordTable.userId, user.id))
     .innerJoin(
       categoryTable,
-      eq(expenseRecordTable.categoryId, categoryTable.id)
+      eq(expenseRecordTable.categoryId, categoryTable.id),
     )
     .innerJoin(
       subCategoryTable,
-      eq(expenseRecordTable.subCategoryId, subCategoryTable.id)
+      eq(expenseRecordTable.subCategoryId, subCategoryTable.id),
     )
     .orderBy(sql`${expenseRecordTable.expenseDate} desc`)
     .$dynamic();
@@ -71,7 +70,7 @@ export const getExpenseRecord = async (
   const conditions: SQLWrapper[] = [];
   if (parseResult.data?.reason && parseResult.data?.reason.trim() !== "") {
     conditions.push(
-      ilike(expenseRecordTable.reason, `%${parseResult.data?.reason}%`)
+      ilike(expenseRecordTable.reason, `%${parseResult.data?.reason}%`),
     );
   }
   if (parseResult.data?.sortBy && parseResult.data?.sortBy.trim() !== "") {
@@ -94,8 +93,8 @@ export const getExpenseRecord = async (
     conditions.push(
       ilike(
         expenseRecordTable.categoryId,
-        `%${parseResult.data?.filterCategory}%`
-      )
+        `%${parseResult.data?.filterCategory}%`,
+      ),
     );
   }
   if (
@@ -105,8 +104,8 @@ export const getExpenseRecord = async (
     conditions.push(
       ilike(
         expenseRecordTable.subCategoryId,
-        `%${parseResult.data?.filterSubCategory}%`
-      )
+        `%${parseResult.data?.filterSubCategory}%`,
+      ),
     );
   }
   if (
@@ -120,14 +119,14 @@ export const getExpenseRecord = async (
 
     conditions.push(
       gte(expenseRecordTable.expenseDate, startDate),
-      lte(expenseRecordTable.expenseDate, endDate)
+      lte(expenseRecordTable.expenseDate, endDate),
     );
   }
   if (parseResult.data?.isHighExpenseRecord === "true") {
     console.log("include high expense records");
 
     conditions.push(
-      gte(expenseRecordTable.amount, config.highExpenseThreshold)
+      gte(expenseRecordTable.amount, config.highExpenseThreshold),
     );
   }
 
@@ -163,7 +162,7 @@ export const getExpenseRecord = async (
 export const getExpenseRecordById = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   const { user } = req as AuthenticatedRequest;
   const id: string = req.params.id;
@@ -177,13 +176,13 @@ export const getExpenseRecordById = async (
   const expenseRecord = await db.query.expenseRecordTable.findFirst({
     where: and(
       eq(expenseRecordTable.id, id),
-      eq(expenseRecordTable.userId, user.id)
+      eq(expenseRecordTable.userId, user.id),
     ),
   });
 
   if (!expenseRecord) {
     const error = new Error(
-      `Expense record with the id of ${id} was not found`
+      `Expense record with the id of ${id} was not found`,
     ) as AppError;
     error.status = 404;
     return next(error);
@@ -196,7 +195,7 @@ export const getExpenseRecordById = async (
 export const createExpenseRecord = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   const { user } = req as AuthenticatedRequest;
 
@@ -218,7 +217,7 @@ export const createExpenseRecord = async (
 
   if (!category) {
     const error = new Error(
-      `Expense record with category ${data.categoryId} was not found`
+      `Expense record with category ${data.categoryId} was not found`,
     ) as AppError;
     error.status = 400;
     return next(error);
@@ -230,7 +229,7 @@ export const createExpenseRecord = async (
 
   if (!subCategory) {
     const error = new Error(
-      `Expense record with sub-category ${data.subCategoryId} was not found`
+      `Expense record with sub-category ${data.subCategoryId} was not found`,
     ) as AppError;
     error.status = 400;
     return next(error);
@@ -249,7 +248,7 @@ export const createExpenseRecord = async (
 export const handleBulkExpenseRecord = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   const { user } = req as AuthenticatedRequest;
 
@@ -293,20 +292,20 @@ export const handleBulkExpenseRecord = async (
         const results: NewExpenseRecord[] = [];
         for (const row of rawRows) {
           const categoryExist = categories.find(
-            (category) => category.name === row.category
+            (category) => category.name === row.category,
           );
           if (!categoryExist) {
             throw new Error(
-              `Expense record with category ${row.category} was not found`
+              `Expense record with category ${row.category} was not found`,
             );
           }
           const categoryId = categoryExist.id;
           const subCategoryExist = subCategories.find(
-            (subCategory) => subCategory.name === row.subCategory
+            (subCategory) => subCategory.name === row.subCategory,
           );
           if (!subCategoryExist) {
             throw new Error(
-              `Expense record with sub-category ${row.subCategory} was not found`
+              `Expense record with sub-category ${row.subCategory} was not found`,
             );
           }
           const subCategoryId = subCategoryExist.id;
@@ -333,7 +332,7 @@ export const handleBulkExpenseRecord = async (
         });
         return;
       } catch (err: any) {
-        res.status(400).json({ error: err.message || "Upload failed" });
+        res.status(400).json({ message: err.message || "Upload failed" });
         return;
       } finally {
         // console.log("----- clear uploaded file -----");
@@ -342,7 +341,7 @@ export const handleBulkExpenseRecord = async (
     })
     .on("error", (err) => {
       fs.unlinkSync(file.path);
-      res.status(500).json({ error: "Failed to parse CSV." });
+      res.status(500).json({ message: "Failed to parse CSV." });
     });
 };
 
@@ -351,7 +350,7 @@ export const handleBulkExpenseRecord = async (
 export const updateExpenseRecord = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   const { user } = req as AuthenticatedRequest;
 
@@ -369,7 +368,7 @@ export const updateExpenseRecord = async (
 
   if (!expenseRecord) {
     const error = new Error(
-      `Expense record with the id of ${id} was not found`
+      `Expense record with the id of ${id} was not found`,
     ) as AppError;
     error.status = 404;
     return next(error);
@@ -377,7 +376,7 @@ export const updateExpenseRecord = async (
 
   if (user.id !== expenseRecord.userId) {
     const error = new Error(
-      "You are not authorized to update this record"
+      "You are not authorized to update this record",
     ) as AppError;
     error.status = 403;
     return next(error);
@@ -398,7 +397,7 @@ export const updateExpenseRecord = async (
 
     if (!category) {
       const error = new Error(
-        `Expense record with category ${data.categoryId} was not found`
+        `Expense record with category ${data.categoryId} was not found`,
       ) as AppError;
       error.status = 400;
       return next(error);
@@ -412,7 +411,7 @@ export const updateExpenseRecord = async (
 
     if (!subCategory) {
       const error = new Error(
-        `Expense record with sub-category ${data.subCategoryId} was not found`
+        `Expense record with sub-category ${data.subCategoryId} was not found`,
       ) as AppError;
       error.status = 400;
       return next(error);
@@ -449,7 +448,7 @@ export const updateExpenseRecord = async (
 export const deleteExpenseRecord = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   const { user } = req as AuthenticatedRequest;
 
@@ -467,7 +466,7 @@ export const deleteExpenseRecord = async (
 
   if (!expenseRecord) {
     const error = new Error(
-      `Expense record with the id of ${id} was not found`
+      `Expense record with the id of ${id} was not found`,
     ) as AppError;
     error.status = 404;
     return next(error);
@@ -475,7 +474,7 @@ export const deleteExpenseRecord = async (
 
   if (user.id !== expenseRecord.userId) {
     const error = new Error(
-      "You are not authorized to delete this record"
+      "You are not authorized to delete this record",
     ) as AppError;
     error.status = 403;
     return next(error);
