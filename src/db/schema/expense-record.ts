@@ -1,9 +1,9 @@
 import { date, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-import type { z } from "zod";
 import { categoryTable } from "./category";
 import { subCategoryTable } from "./sub-category";
 import { userTable } from "./user";
+import { z } from "zod";
 
 export const expenseRecordTable = pgTable("expense_records", {
   id: text("id").primaryKey(),
@@ -34,6 +34,49 @@ export const expenseRecordTable = pgTable("expense_records", {
   }),
 });
 export const insertExpenseRecordSchema = createInsertSchema(expenseRecordTable);
+
+export const REPORT_TYPE = {
+  MONTHLY: "monthly",
+  YEARLY: "yearly",
+  CATEGORY: "category",
+  SUBCATEGORY: "subcategory",
+} as const;
+
+const baseGenerateReportSchema = z.object({
+  fileType: z.enum(["excel", "csv"]),
+  type: z.enum(Object.values(REPORT_TYPE) as [string, ...string[]]),
+});
+
+export const generateReportParamsSchema = z.discriminatedUnion("type", [
+  // Monthly Report
+  baseGenerateReportSchema.extend({
+    type: z.literal(REPORT_TYPE.MONTHLY),
+    month: z.coerce.number().min(1).max(12),
+    year: z.coerce.number().min(2000),
+  }),
+
+  // Yearly Report
+  baseGenerateReportSchema.extend({
+    type: z.literal(REPORT_TYPE.YEARLY),
+    year: z.coerce.number().min(2000),
+  }),
+
+  // Category Report
+  baseGenerateReportSchema.extend({
+    type: z.literal(REPORT_TYPE.CATEGORY),
+    month: z.coerce.number().min(1).max(12).optional(),
+    year: z.coerce.number().min(2000),
+    categoryId: z.string().min(1),
+  }),
+
+  // Subcategory Report
+  baseGenerateReportSchema.extend({
+    type: z.literal(REPORT_TYPE.SUBCATEGORY),
+    month: z.coerce.number().min(1).max(12).optional(),
+    year: z.coerce.number().min(2000),
+    subCategoryId: z.string().min(1),
+  }),
+]);
 
 export type expenseRecord = typeof expenseRecordTable.$inferSelect;
 export type NewExpenseRecord = z.infer<typeof insertExpenseRecordSchema>;

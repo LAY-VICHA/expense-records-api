@@ -68,7 +68,6 @@ export const getDashboardCardData = async (
   const totalDays = Math.max(Math.ceil(findTotalDays / (1000 * 3600 * 24)), 1);
 
   const averagePerDay = Number(totalExpense) / totalDays;
-  console.log(Number(totalExpense));
 
   res.json({
     success: true,
@@ -123,7 +122,6 @@ export const getDashboardBarchart = async (
     }
     startDate = new Date(numericYear, 0, 1, 7, 0, 0, 0);
     endDate = new Date(numericYear, 11, 31, 30, 59, 59, 999);
-    console.log("sasas", startDate, endDate);
   }
 
   const expenses = await db.query.expenseRecordTable.findMany({

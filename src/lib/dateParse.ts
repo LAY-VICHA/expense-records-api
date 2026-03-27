@@ -7,6 +7,25 @@ export const parseDate = (dateStr: string, isEnd = false): Date => {
     isEnd ? 30 : 7,
     isEnd ? 59 : 0,
     isEnd ? 59 : 0,
-    isEnd ? 999 : 0
+    isEnd ? 999 : 0,
   );
+};
+
+export const getMonthName = (month: number): string => {
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  return months[month - 1] || "";
 };

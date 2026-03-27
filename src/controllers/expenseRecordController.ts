@@ -2,6 +2,7 @@ import { db } from "@/db";
 import {
   categoryTable,
   expenseRecordTable,
+  generateReportParamsSchema,
   NewExpenseRecord,
   subCategoryTable,
 } from "@/db/schema";
@@ -16,6 +17,11 @@ import { expenseRecordQuerySchema } from "@/types/expenseRecord";
 import { parseDate } from "@/lib/dateParse";
 import { AuthenticatedRequest } from "@/middleware/authentication";
 import config from "@/config/config";
+import {
+  getExpenseReportPrintData,
+  generateExpenseExcel,
+} from "@/services/expenseRecordService";
+import { getMonthName } from "@/lib/dateParse";
 
 export const getExpenseRecord = async (
   req: Request,
@@ -492,4 +498,74 @@ export const deleteExpenseRecord = async (
     status: 200,
   });
   return;
+};
+
+export const generateExpenseReport = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const { user } = req as AuthenticatedRequest;
+
+  if (!user.id) {
+    const error = new Error("User is not authenticated") as AppError;
+    error.status = 401;
+    return next(error);
+  }
+
+  const body = await req.body;
+
+  const validatedInput = generateReportParamsSchema.safeParse(body);
+
+  if (!validatedInput.success) {
+    const error = new Error(
+      validatedInput.error.message || "Invalid input",
+    ) as AppError;
+    error.status = 400;
+    return next(error);
+  }
+
+  const data = validatedInput.data;
+
+  const printData = await getExpenseReportPrintData(data, user.id);
+
+  let reportTitle = "";
+
+  if (data.type === "monthly") {
+    reportTitle = `${data.year}-${getMonthName(data.month)}-Expense Report`;
+  } else if (data.type === "yearly") {
+    reportTitle = `${data.year}-Expense Report`;
+  } else if (data.type === "category") {
+    const category = await db.query.categoryTable.findFirst({
+      where: eq(categoryTable.id, data.categoryId),
+    });
+
+    const month = data.month ? `-${getMonthName(data.month)}` : "";
+    reportTitle = `${category?.name}-${data.year}${month}-Expense Report`;
+  } else {
+    const subCategory = await db.query.subCategoryTable.findFirst({
+      where: eq(subCategoryTable.id, data.subCategoryId),
+    });
+
+    const month = data.month ? `-${getMonthName(data.month)}` : "";
+    reportTitle = `${subCategory?.name}-${data.year}${month}-Expense Report`;
+  }
+
+  const workbook = await generateExpenseExcel(printData, reportTitle);
+
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename=${reportTitle}.xlsx`,
+  );
+
+  res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
+
+  await workbook.xlsx.write(res);
+
+  res.end();
 };

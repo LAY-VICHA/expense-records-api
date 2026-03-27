@@ -41,6 +41,7 @@
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.43.1",
     "drizzle-zod": "^0.7.1",
+    "exceljs": "^4.4.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.0",
     "pg": "^8.16.0",

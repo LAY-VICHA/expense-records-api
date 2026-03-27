@@ -6,6 +6,7 @@ import {
   handleBulkExpenseRecord,
   updateExpenseRecord,
   deleteExpenseRecord,
+  generateExpenseReport,
 } from "@/controllers/expenseRecordController";
 import { upload } from "../middleware/upload";
 import { authenticateToken } from "@/middleware/authentication";
@@ -19,8 +20,9 @@ router.post(
   "/bulk",
   authenticateToken,
   upload.single("file"),
-  handleBulkExpenseRecord
+  handleBulkExpenseRecord,
 );
+router.post("/report", authenticateToken, generateExpenseReport);
 router.put("/:id", authenticateToken, updateExpenseRecord);
 router.delete("/:id", authenticateToken, deleteExpenseRecord);
 
